@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+
+	"github.com/cockroachdb/pebble"
 )
 
 const (
@@ -148,4 +150,43 @@ func ParseMigrationKey(key []byte) (BlockID, error) {
 // BlockIDFromShardAndHour constructs a BlockID from its components.
 func BlockIDFromShardAndHour(shard ShardID, hour string) BlockID {
 	return BlockID(fmt.Sprintf("%04x:%s", uint16(shard), hour))
+}
+
+// IdxLookupBlocks scans the sparse index for (eventType, keyHash) and returns all matching BlockIDs.
+func IdxLookupBlocks(db *DB, eventType uint8, keyHash uint64) ([]BlockID, error) {
+	prefix := IdxKeyPrefix(eventType, keyHash)
+	upper := make([]byte, len(prefix))
+	copy(upper, prefix)
+	upper[len(upper)-1]++
+
+	iter, err := db.p.NewIter(&pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: upper,
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	var ids []BlockID
+	for iter.First(); iter.Valid(); iter.Next() {
+		_, _, bid, err := ParseIdxKey(iter.Key())
+		if err != nil {
+			continue
+		}
+		ids = append(ids, bid)
+	}
+	return ids, iter.Error()
+}
+
+// PutIdxBatch writes a slice of (eventType, keyHash) → blockID idx entries in one NoSync batch.
+func PutIdxBatch(db *DB, eventType uint8, keyHashes []uint64, blockID BlockID) error {
+	batch := db.p.NewBatch()
+	for _, h := range keyHashes {
+		if err := batch.Set(IdxKey(eventType, h, blockID), []byte{}, pebble.NoSync); err != nil {
+			batch.Close()
+			return err
+		}
+	}
+	return batch.Commit(pebble.NoSync)
 }
