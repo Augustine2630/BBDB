@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"go.uber.org/zap"
+
 	"BBDB/internal/block"
 	"BBDB/internal/index"
 	"BBDB/internal/meta"
@@ -57,6 +59,8 @@ func (e *Engine) Query(ctx context.Context, req QueryRequest) ([]block.Event, er
 	if !req.From.Before(req.To) {
 		return nil, errors.New("From must be before To")
 	}
+
+	start := time.Now()
 
 	keyHash := block.KeyHashFor(req.PartitionKey)
 
@@ -159,6 +163,16 @@ func (e *Engine) Query(ctx context.Context, req QueryRequest) ([]block.Event, er
 			slices = append(slices, r.events)
 		}
 	}
+
+	var totalRows int
+	for _, s := range slices {
+		totalRows += len(s)
+	}
+	zap.L().Debug("query executed",
+		zap.Int("blocks_scanned", len(tasks)),
+		zap.Int("rows_returned", totalRows),
+		zap.Duration("elapsed", time.Since(start)),
+	)
 
 	return MergeEvents(slices), nil
 }

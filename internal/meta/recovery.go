@@ -1,6 +1,8 @@
 package meta
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/cockroachdb/pebble"
 )
 
@@ -39,5 +41,11 @@ func FindOrphanedWALShards(db *DB) ([]ShardID, error) {
 		}
 		orphans = append(orphans, shard)
 	}
+
+	zap.L().Info("crash recovery scan", zap.Int("wal_shards_found", len(orphans)))
+	for _, shard := range orphans {
+		zap.L().Warn("replaying WAL shard", zap.Uint16("shard", uint16(shard)))
+	}
+
 	return orphans, nil
 }
