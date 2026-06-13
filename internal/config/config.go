@@ -39,6 +39,7 @@ type QueryConfig struct {
 
 // TTLConfig controls the reaper and janitor.
 type TTLConfig struct {
+	RetentionPeriod        time.Duration `mapstructure:"retention_period"`
 	ReaperInterval         time.Duration `mapstructure:"reaper_interval"`
 	ReaperMaxDeletesPerSec int           `mapstructure:"reaper_max_deletes_per_sec"`
 	JanitorInterval        time.Duration `mapstructure:"janitor_interval"`
@@ -71,6 +72,7 @@ func Load(cfgFile string) (Config, error) {
 	v.SetDefault("ingestion.ring_buf_size", 16384)
 	v.SetDefault("query.max_parallel", 8)
 	v.SetDefault("query.bloom_cache_bytes", int64(64*1024*1024))
+	v.SetDefault("ttl.retention_period", 5*365*24*time.Hour)
 	v.SetDefault("ttl.reaper_interval", 10*time.Minute)
 	v.SetDefault("ttl.reaper_max_deletes_per_sec", 100)
 	v.SetDefault("ttl.janitor_interval", time.Hour)

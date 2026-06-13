@@ -22,6 +22,7 @@ query:
   bloom_cache_bytes: 67108864   # 64 MiB
 
 ttl:
+  retention_period: 43800h  # 5 years (5 * 365 * 24h); blocks are deleted after this period
   reaper_interval: 10m
   reaper_max_deletes_per_sec: 100
   janitor_interval: 1h

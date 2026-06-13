@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	idxChunkSize   = 100_000
-	retentionYears = 5
+	idxChunkSize          = 100_000
+	defaultRetentionHours = 5 * 365 * 24 // 5 years
 )
 
 // SealRequest holds all inputs needed to seal a memtable into a block file.
@@ -23,9 +23,10 @@ type SealRequest struct {
 	TmpDir    string
 	Shard     meta.ShardID
 	EventType uint8
-	OpenedAt  int64 // unix nano
-	SealedAt  int64 // unix nano
+	OpenedAt  int64         // unix nano
+	SealedAt  int64         // unix nano
 	Memtable  *Memtable
+	Retention time.Duration // how long to keep the block; 0 = default 5 years
 }
 
 // Seal sorts the memtable, writes a compressed block file, writes a bloom file,
@@ -135,7 +136,11 @@ func Seal(ctx context.Context, req SealRequest) (meta.BlockID, error) {
 
 	// 6. Final atomic Sync batch: WAL truncate + block meta + expiry key
 	openHour := uint64(time.Unix(0, req.OpenedAt).UTC().Unix() / 3600)
-	expiryHour := openHour + retentionYears*365*24
+	retentionHours := uint64(req.Retention.Hours())
+	if retentionHours == 0 {
+		retentionHours = defaultRetentionHours
+	}
+	expiryHour := openHour + retentionHours
 
 	bm := meta.BlockMeta{
 		ShardID:  req.Shard,
