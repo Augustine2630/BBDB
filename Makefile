@@ -64,6 +64,11 @@ test/plan5: ## Config + CLI: config + server
 	go test ./internal/config/... ./internal/server/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
+.PHONY: test/grpc
+test/grpc: ## gRPC layer tests
+	go test ./internal/grpc/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
+	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
+
 # Configurable: CONFIG=configs/bbdb.example.yaml make run
 CONFIG ?=
 IMAGE  ?= bbdb
