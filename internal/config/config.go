@@ -58,6 +58,22 @@ type GRPCConfig struct {
 	ListenAddr string `mapstructure:"listen_addr"`
 }
 
+// LogFileConfig controls file output and rotation for the logger.
+type LogFileConfig struct {
+	Path       string `mapstructure:"path"`
+	MaxSizeMB  int    `mapstructure:"max_size_mb"`
+	MaxBackups int    `mapstructure:"max_backups"`
+	MaxAgeDays int    `mapstructure:"max_age_days"`
+	Compress   bool   `mapstructure:"compress"`
+}
+
+// LogConfig controls the structured logger.
+type LogConfig struct {
+	Level  string        `mapstructure:"level"`  // debug | info | warn | error
+	Format string        `mapstructure:"format"` // text | json | json-ecs
+	File   LogFileConfig `mapstructure:"file"`
+}
+
 // Config is the root configuration for a BBDB node.
 type Config struct {
 	Data      DataConfig      `mapstructure:"data"`
@@ -67,6 +83,7 @@ type Config struct {
 	Query     QueryConfig     `mapstructure:"query"`
 	TTL       TTLConfig       `mapstructure:"ttl"`
 	GRPC      GRPCConfig      `mapstructure:"grpc"`
+	Log       LogConfig       `mapstructure:"log"`
 }
 
 // Load reads configuration from cfgFile (YAML). If cfgFile is empty, only
@@ -95,6 +112,13 @@ func Load(cfgFile string) (Config, error) {
 	v.SetDefault("ttl.janitor_interval", time.Hour)
 	v.SetDefault("ttl.shutdown_timeout", 30*time.Second)
 	v.SetDefault("grpc.listen_addr", ":7070")
+	v.SetDefault("log.level", "info")
+	v.SetDefault("log.format", "json")
+	v.SetDefault("log.file.path", "")
+	v.SetDefault("log.file.max_size_mb", 100)
+	v.SetDefault("log.file.max_backups", 5)
+	v.SetDefault("log.file.max_age_days", 30)
+	v.SetDefault("log.file.compress", true)
 
 	// Environment variables: BBDB_DATA__PEBBLE_DIR → data.pebble_dir
 	v.SetEnvPrefix("BBDB")

@@ -35,3 +35,13 @@ ttl:
 
 grpc:
   listen_addr: ":7070"
+
+log:
+  level: info          # debug | info | warn | error
+  format: json         # text | json | json-ecs
+  file:
+    path: ""           # "" = stdout only; set path to enable file output
+    max_size_mb: 100
+    max_backups: 5
+    max_age_days: 30
+    compress: true
