@@ -6,6 +6,7 @@ require (
 	github.com/bits-and-blooms/bloom/v3 v3.7.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v1.1.5
+	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.18.6
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
