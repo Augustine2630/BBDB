@@ -51,6 +51,14 @@ test/plan4: ## TTL reaper + janitor
 	go test ./internal/ttl/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
+.PHONY: test/integration
+test/integration: ## End-to-end integration tests (write+read+TTL)
+	go test ./tests/integration/... -v -count=1
+
+.PHONY: test/integration/short
+test/integration/short: ## Integration tests excluding high-volume (fast CI)
+	go test ./tests/integration/... -v -count=1 -short
+
 .PHONY: test/plan5
 test/plan5: ## Config + CLI: config + server
 	go test ./internal/config/... ./internal/server/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
