@@ -35,7 +35,7 @@ func (s *QueryServer) Query(req *bbdbv1.QueryRequest, stream grpc.ServerStreamin
 		return stream.Send(terminalError(0, "from_ns must be before to_ns"))
 	}
 
-	zap.L().Debug("query received",
+	zap.L().Info("query received",
 		zap.ByteString("partition_key", req.GetPartitionKey()),
 		zap.Int64("from_ns", req.GetFromNs()),
 		zap.Int64("to_ns", req.GetToNs()),
@@ -85,7 +85,7 @@ func (s *QueryServer) Query(req *bbdbv1.QueryRequest, stream grpc.ServerStreamin
 		sent += uint64(len(batch))
 	}
 
-	zap.L().Debug("query complete", zap.Uint64("total", sent))
+	zap.L().Info("query complete", zap.Uint64("total", sent))
 
 	// Empty result: send a single terminal message.
 	if len(protoEvents) == 0 {

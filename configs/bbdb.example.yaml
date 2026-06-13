@@ -2,16 +2,16 @@
 # All values shown are defaults. Override via env: BBDB_<SECTION>__<KEY>
 
 data:
-  pebble_dir: /data/pebble  # local dev: ./pebble
-  tmp_dir: /data/tmp         # local dev: ./tmp
+  pebble_dir: ./pebble
+  tmp_dir: ./tmp
 
 tiers:
   hot:
-    root: /data/tiers/hot   # local dev: ./tiers/hot
+    root: ./tiers/hot
   warm:
-    root: /data/tiers/warm  # local dev: ./tiers/warm
+    root: ./tiers/warm
   cold:
-    root: /data/tiers/cold  # local dev: ./tiers/cold
+    root: ./tiers/cold
 
 ingestion:
   batch_interval: 2ms
@@ -38,9 +38,9 @@ grpc:
 
 log:
   level: info          # debug | info | warn | error
-  format: json         # text | json | json-ecs
+  format: text         # text | json | json-ecs
   file:
-    path: ""           # "" = stdout only; set path to enable file output
+    path: "./bbdb.log"           # "" = stdout only; set path to enable file output
     max_size_mb: 100
     max_backups: 5
     max_age_days: 30

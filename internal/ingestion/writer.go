@@ -45,6 +45,7 @@ type ShardWriter struct {
 	memtable *block.Memtable
 	openedAt time.Time // UTC hour when the current block was opened
 	stopCh   chan struct{}
+	doneCh   chan struct{} // closed after run() goroutine finishes the final seal
 }
 
 // NewShardWriter creates and starts a ShardWriter background goroutine for the given shard.
@@ -60,6 +61,7 @@ func NewShardWriter(db *meta.DB, shard meta.ShardID, cfg WriterConfig) *ShardWri
 		memtable: block.NewMemtable(),
 		openedAt: hourBoundary(time.Now().UTC()),
 		stopCh:   make(chan struct{}),
+		doneCh:   make(chan struct{}),
 	}
 	go sw.run()
 	zap.L().Debug("shard writer started", zap.Uint16("shard", uint16(shard)))
@@ -81,14 +83,15 @@ func (sw *ShardWriter) Memtable() *block.Memtable {
 	return sw.memtable
 }
 
-// Stop signals the background goroutine to exit after a final flush.
-// If autoseal is configured the final memtable is sealed before Stop returns.
+// Stop signals the background goroutine to exit and waits for the final seal to complete.
 func (sw *ShardWriter) Stop() {
 	close(sw.stopCh)
+	<-sw.doneCh
 }
 
 // run is the background goroutine: drains ring buffer every BatchInterval.
 func (sw *ShardWriter) run() {
+	defer close(sw.doneCh)
 	ticker := time.NewTicker(sw.cfg.BatchInterval)
 	defer ticker.Stop()
 	for {

@@ -51,7 +51,7 @@ func (s *IngestionServer) Write(stream bbdbv1.EventIngestion_WriteServer) error 
 
 // handleBatch processes a single WriteRequest and returns a WriteResponse.
 func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequest) *bbdbv1.WriteResponse {
-	zap.L().Debug("write batch received",
+	zap.L().Info("write batch received",
 		zap.String("batch_id", req.GetBatchId()),
 		zap.Int("events", len(req.GetEvents())),
 		zap.String("request_id", RequestIDFromContext(ctx)),
@@ -126,11 +126,24 @@ func (s *IngestionServer) getOrCreateWriter(shard meta.ShardID) *ingestion.Shard
 	return w
 }
 
-// Stop stops all shard writers.
+// Stop stops all shard writers, waiting for each to complete its final seal.
 func (s *IngestionServer) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	writers := make([]*ingestion.ShardWriter, 0, len(s.writers))
 	for _, w := range s.writers {
-		w.Stop()
+		writers = append(writers, w)
+	}
+	s.mu.Unlock()
+
+	done := make(chan struct{}, len(writers))
+	for _, w := range writers {
+		w := w
+		go func() {
+			w.Stop()
+			done <- struct{}{}
+		}()
+	}
+	for range writers {
+		<-done
 	}
 }

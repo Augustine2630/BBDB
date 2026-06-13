@@ -1,9 +1,0 @@
-data:
-  pebble_dir: ./pebble
-  tmp_dir:    ./tmp
-tiers:
-  hot:  { root: ./tiers/hot }
-  warm: { root: ./tiers/warm }
-  cold: { root: ./tiers/cold }
-grpc:
-  listen_addr: ":7070"

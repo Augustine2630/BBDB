@@ -53,8 +53,11 @@ func (s *Server) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		zap.L().Info("gRPC server stopping")
-		s.grpc.GracefulStop()
+		// Flush and seal all shard writers before stopping the gRPC server.
+		// GracefulStop blocks until active streams close (including long-lived write streams),
+		// so we seal first to guarantee data durability regardless of client disconnect timing.
 		s.ingestion.Stop()
+		s.grpc.GracefulStop()
 		zap.L().Info("gRPC server stopped")
 		return nil
 	case err := <-errCh:
