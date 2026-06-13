@@ -70,13 +70,14 @@ test/grpc: ## gRPC layer tests
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
 # Configurable: CONFIG=configs/bbdb.example.yaml make run
-CONFIG ?=
-IMAGE  ?= bbdb
-TAG    ?= latest
+CONFIG  ?=
+IMAGE   ?= bbdb
+TAG     ?= latest
+VERSION ?= dev
 
 .PHONY: build/bbdb
-build/bbdb: ## Build the bbdb binary → bin/bbdb
-	go build -trimpath -ldflags="-s -w" -o bin/bbdb ./cmd/bbdb/
+build/bbdb: ## Build the bbdb binary → bin/bbdb (VERSION=1.0.0 make build/bbdb)
+	go build -trimpath -ldflags="-s -w -X main.version=$(VERSION)" -o bin/bbdb ./cmd/bbdb/
 
 .PHONY: run
 run: build/bbdb ## Run bbdb (CONFIG=path/to/cfg.yaml make run)
