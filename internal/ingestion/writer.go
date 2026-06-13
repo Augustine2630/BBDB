@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"go.uber.org/zap"
+
 	"BBDB/internal/block"
 	"BBDB/internal/meta"
 	"BBDB/internal/tier"
@@ -60,6 +62,7 @@ func NewShardWriter(db *meta.DB, shard meta.ShardID, cfg WriterConfig) *ShardWri
 		stopCh:   make(chan struct{}),
 	}
 	go sw.run()
+	zap.L().Debug("shard writer started", zap.Uint16("shard", uint16(shard)))
 	return sw
 }
 
@@ -108,7 +111,9 @@ func (sw *ShardWriter) flushAndMaybeSeal(ctx context.Context, forceSeal bool) {
 		if err != nil {
 			continue
 		}
-		_ = meta.WALAppend(sw.db, sw.shard, data)
+		if err := meta.WALAppend(sw.db, sw.shard, data); err != nil {
+			zap.L().Error("WAL append failed", zap.Error(err), zap.Uint16("shard", uint16(sw.shard)))
+		}
 		sw.memtable.Append(e)
 	}
 
@@ -127,13 +132,28 @@ func (sw *ShardWriter) flushAndMaybeSeal(ctx context.Context, forceSeal bool) {
 			// size-triggered early seal: SealedAt carries the real timestamp
 			sealedAt = now
 		}
+		var reason string
+		switch {
+		case forceSeal:
+			reason = "stop"
+		case hourChanged:
+			reason = "hour_change"
+		default:
+			reason = "size"
+		}
+		zap.L().Info("seal triggered",
+			zap.String("reason", reason),
+			zap.Uint16("shard", uint16(sw.shard)),
+		)
 		sw.sealCurrent(ctx, sealedAt)
 	}
 }
 
 // sealCurrent calls block.Seal for the current memtable, then resets for the next block.
 func (sw *ShardWriter) sealCurrent(ctx context.Context, sealedAt time.Time) {
-	_, _ = block.Seal(ctx, block.SealRequest{
+	start := time.Now()
+	rows := sw.memtable.Len()
+	id, err := block.Seal(ctx, block.SealRequest{
 		DB:           sw.db,
 		Store:        sw.cfg.Store,
 		TmpDir:       sw.cfg.TmpDir,
@@ -146,6 +166,18 @@ func (sw *ShardWriter) sealCurrent(ctx context.Context, sealedAt time.Time) {
 		BloomFPR:     sw.cfg.BloomFPR,
 		IdxChunkSize: sw.cfg.IdxChunkSize,
 	})
+	if err != nil {
+		zap.L().Error("seal failed",
+			zap.Error(err),
+			zap.Uint16("shard", uint16(sw.shard)),
+		)
+	} else {
+		zap.L().Info("seal complete",
+			zap.String("block_id", string(id)),
+			zap.Int("rows", rows),
+			zap.Duration("elapsed", time.Since(start)),
+		)
+	}
 	sw.memtable = block.NewMemtable()
 	sw.openedAt = hourBoundary(sealedAt)
 }
