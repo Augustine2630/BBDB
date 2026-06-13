@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"BBDB/internal/config"
+	bbdbgrpc "BBDB/internal/grpc"
 	"BBDB/internal/index"
 	"BBDB/internal/ingestion"
 	"BBDB/internal/meta"
@@ -23,6 +24,7 @@ type Server struct {
 	janitor         *ttl.Janitor
 	tiers           map[meta.Tier]tier.TierStore
 	writerCfg       ingestion.WriterConfig // base config for ShardWriter (autoseal wired)
+	grpcServer      *bbdbgrpc.Server
 	shutdownTimeout time.Duration
 	onShutdown      func() // called just before db.Close, for testing
 }
@@ -96,6 +98,8 @@ func New(cfg config.Config) (*Server, error) {
 		IdxChunkSize:  cfg.Block.IdxChunkSize,
 	}
 
+	grpcServer := bbdbgrpc.NewServer(cfg.GRPC.ListenAddr, db, writerCfg)
+
 	return &Server{
 		db:              db,
 		engine:          engine,
@@ -103,6 +107,7 @@ func New(cfg config.Config) (*Server, error) {
 		janitor:         janitor,
 		tiers:           tiers,
 		writerCfg:       writerCfg,
+		grpcServer:      grpcServer,
 		shutdownTimeout: timeout,
 	}, nil
 }
@@ -134,7 +139,7 @@ func (s *Server) QueryEngine() *query.Engine {
 func (s *Server) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		s.janitor.Run(ctx)
@@ -142,6 +147,10 @@ func (s *Server) Run(ctx context.Context) error {
 	go func() {
 		defer wg.Done()
 		s.reaper.Run(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		_ = s.grpcServer.Run(ctx)
 	}()
 
 	<-ctx.Done()
