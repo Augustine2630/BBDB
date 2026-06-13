@@ -113,6 +113,48 @@ func sealTestBlock(t *testing.T, store tier.TierStore, shard meta.ShardID, event
 	return id
 }
 
+func TestEngineQueryEmptyRange(t *testing.T) {
+	engine, _, _, cleanup := setupEngine(t)
+	defer cleanup()
+
+	et := uint8(0x01)
+	req := query.QueryRequest{
+		PartitionKey: []byte("nobody"),
+		EventType:    &et,
+		From:         time.Date(2026, 6, 11, 14, 0, 0, 0, time.UTC),
+		To:           time.Date(2026, 6, 11, 15, 0, 0, 0, time.UTC),
+	}
+	events, err := engine.Query(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("want 0 events, got %d", len(events))
+	}
+}
+
+func TestEngineQueryValidatesRequest(t *testing.T) {
+	engine, _, _, cleanup := setupEngine(t)
+	defer cleanup()
+
+	_, err := engine.Query(context.Background(), query.QueryRequest{
+		From: time.Now(),
+		To:   time.Now().Add(time.Hour),
+	})
+	if err == nil {
+		t.Fatal("expected error for empty PartitionKey")
+	}
+
+	_, err = engine.Query(context.Background(), query.QueryRequest{
+		PartitionKey: []byte("user"),
+		From:         time.Now().Add(time.Hour),
+		To:           time.Now(),
+	})
+	if err == nil {
+		t.Fatal("expected error for From >= To")
+	}
+}
+
 func TestEngineQueryFindsEvents(t *testing.T) {
 	engine, db, store, cleanup := setupEngine(t)
 	defer cleanup()
