@@ -29,6 +29,7 @@ type TiersConfig struct {
 type IngestionConfig struct {
 	BatchInterval time.Duration `mapstructure:"batch_interval"`
 	RingBufSize   int           `mapstructure:"ring_buf_size"`
+	MaxBlockBytes int64         `mapstructure:"max_block_bytes"` // size-based seal; 0 = 256 MiB
 }
 
 // QueryConfig controls the read-path engine.
@@ -70,6 +71,7 @@ func Load(cfgFile string) (Config, error) {
 	v.SetDefault("tiers.cold.root", "/data/tiers/cold")
 	v.SetDefault("ingestion.batch_interval", 2*time.Millisecond)
 	v.SetDefault("ingestion.ring_buf_size", 16384)
+	v.SetDefault("ingestion.max_block_bytes", int64(256<<20))
 	v.SetDefault("query.max_parallel", 8)
 	v.SetDefault("query.bloom_cache_bytes", int64(64*1024*1024))
 	v.SetDefault("ttl.retention_period", 5*365*24*time.Hour)

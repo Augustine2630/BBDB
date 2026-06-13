@@ -8,6 +8,7 @@ import (
 
 	"BBDB/internal/config"
 	"BBDB/internal/index"
+	"BBDB/internal/ingestion"
 	"BBDB/internal/meta"
 	"BBDB/internal/query"
 	"BBDB/internal/tier"
@@ -21,6 +22,7 @@ type Server struct {
 	reaper          *ttl.Reaper
 	janitor         *ttl.Janitor
 	tiers           map[meta.Tier]tier.TierStore
+	writerCfg       ingestion.WriterConfig // base config for ShardWriter (autoseal wired)
 	shutdownTimeout time.Duration
 	onShutdown      func() // called just before db.Close, for testing
 }
@@ -83,14 +85,30 @@ func New(cfg config.Config) (*Server, error) {
 		timeout = 30 * time.Second
 	}
 
+	writerCfg := ingestion.WriterConfig{
+		BatchInterval: cfg.Ingestion.BatchInterval,
+		RingBufSize:   cfg.Ingestion.RingBufSize,
+		Store:         hotStore,
+		TmpDir:        cfg.Data.TmpDir,
+		Retention:     cfg.TTL.RetentionPeriod,
+		MaxBlockBytes: cfg.Ingestion.MaxBlockBytes,
+	}
+
 	return &Server{
 		db:              db,
 		engine:          engine,
 		reaper:          reaper,
 		janitor:         janitor,
 		tiers:           tiers,
+		writerCfg:       writerCfg,
 		shutdownTimeout: timeout,
 	}, nil
+}
+
+// WriterConfig returns the base WriterConfig for creating ShardWriters.
+// The config has autoseal wired to the hot tier store.
+func (s *Server) WriterConfig() ingestion.WriterConfig {
+	return s.writerCfg
 }
 
 // OnShutdown registers a hook called just before db.Close during shutdown.

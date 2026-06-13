@@ -16,6 +16,7 @@ tiers:
 ingestion:
   batch_interval: 2ms
   ring_buf_size: 16384
+  max_block_bytes: 268435456  # 256 MiB; size-triggered seal
 
 query:
   max_parallel: 8
