@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	bbdbv1 "BBDB/api/gen/bbdb/v1"
 	"BBDB/internal/block"
@@ -16,6 +17,7 @@ type IngestionServer struct {
 	bbdbv1.UnimplementedEventIngestionServer
 	db        *meta.DB
 	writerCfg ingestion.WriterConfig
+	mu        sync.RWMutex
 	writers   map[meta.ShardID]*ingestion.ShardWriter
 }
 
@@ -47,12 +49,15 @@ func (s *IngestionServer) Write(stream bbdbv1.EventIngestion_WriteServer) error 
 
 // handleBatch processes a single WriteRequest and returns a WriteResponse.
 func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequest) *bbdbv1.WriteResponse {
-	// Validate event types.
+	blockEvents, resolvedKeys := ProtoEventsToBlock(req.GetEvents())
+
+	// Validate event types — after key resolution so partition_keys is always populated.
 	for _, e := range req.GetEvents() {
 		if e.GetEventType() > 255 {
 			return &bbdbv1.WriteResponse{
-				BatchId:  req.GetBatchId(),
-				Accepted: 0,
+				BatchId:       req.GetBatchId(),
+				Accepted:      0,
+				PartitionKeys: resolvedKeys,
 				Error: &bbdbv1.Error{
 					Code:    1,
 					Message: fmt.Sprintf("event_type %d exceeds max value 255", e.GetEventType()),
@@ -60,8 +65,6 @@ func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequ
 			}
 		}
 	}
-
-	blockEvents, resolvedKeys := ProtoEventsToBlock(req.GetEvents())
 
 	// Group by shard and write.
 	shardEvents := make(map[meta.ShardID][]block.Event)
@@ -72,7 +75,17 @@ func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequ
 
 	for shard, events := range shardEvents {
 		w := s.getOrCreateWriter(shard)
-		_ = w.Write(ctx, events)
+		if err := w.Write(ctx, events); err != nil {
+			return &bbdbv1.WriteResponse{
+				BatchId:       req.GetBatchId(),
+				Accepted:      0,
+				PartitionKeys: resolvedKeys,
+				Error: &bbdbv1.Error{
+					Code:    2,
+					Message: err.Error(),
+				},
+			}
+		}
 	}
 
 	return &bbdbv1.WriteResponse{
@@ -84,16 +97,27 @@ func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequ
 
 // getOrCreateWriter returns an existing ShardWriter or creates a new one.
 func (s *IngestionServer) getOrCreateWriter(shard meta.ShardID) *ingestion.ShardWriter {
-	if w, ok := s.writers[shard]; ok {
+	s.mu.RLock()
+	w, ok := s.writers[shard]
+	s.mu.RUnlock()
+	if ok {
 		return w
 	}
-	w := ingestion.NewShardWriter(s.db, shard, s.writerCfg)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Re-check after acquiring write lock to avoid double creation.
+	if w, ok = s.writers[shard]; ok {
+		return w
+	}
+	w = ingestion.NewShardWriter(s.db, shard, s.writerCfg)
 	s.writers[shard] = w
 	return w
 }
 
 // Stop stops all shard writers.
 func (s *IngestionServer) Stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, w := range s.writers {
 		w.Stop()
 	}
