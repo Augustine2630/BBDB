@@ -51,6 +51,19 @@ test/plan4: ## TTL reaper + janitor
 	go test ./internal/ttl/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
+.PHONY: test/plan5
+test/plan5: ## Config + CLI: config + server
+	go test ./internal/config/... ./internal/server/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
+	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
+
+.PHONY: build/bbdb
+build/bbdb: ## Build the bbdb binary
+	go build -o bin/bbdb ./cmd/bbdb/
+
+.PHONY: run
+run: build/bbdb ## Run bbdb with default config (requires data dirs to exist)
+	./bin/bbdb start
+
 # ── Single package ─────────────────────────────────────────────────────────────
 
 .PHONY: test/pkg
