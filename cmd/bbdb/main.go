@@ -8,8 +8,10 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
 	"BBDB/internal/config"
+	"BBDB/internal/logger"
 	"BBDB/internal/server"
 )
 
@@ -48,6 +50,13 @@ func newStartCmd(cfgFile *string) *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
+			if err := logger.Init(cfg.Log); err != nil {
+				return fmt.Errorf("init logger: %w", err)
+			}
+			defer logger.Sync() //nolint:errcheck
+
+			zap.L().Info("bbdb starting", zap.String("version", version))
+
 			srv, err := server.New(cfg)
 			if err != nil {
 				return fmt.Errorf("init server: %w", err)
@@ -56,12 +65,12 @@ func newStartCmd(cfgFile *string) *cobra.Command {
 			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 			defer stop()
 
-			fmt.Fprintln(cmd.OutOrStdout(), "bbdb starting…")
-			fmt.Fprintln(cmd.OutOrStdout(), "bbdb ready. Press Ctrl+C to stop.")
+			zap.L().Info("bbdb ready")
 			if err := srv.Run(ctx); err != nil {
+				zap.L().Error("fatal error", zap.Error(err))
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), "bbdb stopped")
+			zap.L().Info("bbdb stopped")
 			return nil
 		},
 	}
