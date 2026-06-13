@@ -1,0 +1,25 @@
+syntax = "proto3";
+package bbdb.v1;
+
+option go_package = "BBDB/api/gen/bbdb/v1;bbdbv1";
+option java_package = "io.bbdb.v1";
+option java_multiple_files = true;
+
+import "bbdb/v1/common.proto";
+
+service EventIngestion {
+  // Bidirectional stream: client sends batches, server acknowledges each.
+  rpc Write(stream WriteRequest) returns (stream WriteResponse);
+}
+
+message WriteRequest {
+  repeated Event events   = 1;
+  string         batch_id = 2;
+}
+
+message WriteResponse {
+  string         batch_id       = 1;
+  uint32         accepted       = 2;
+  repeated bytes partition_keys = 3;
+  Error          error          = 4;
+}

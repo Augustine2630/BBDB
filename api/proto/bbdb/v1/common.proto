@@ -1,0 +1,18 @@
+syntax = "proto3";
+package bbdb.v1;
+
+option go_package = "BBDB/api/gen/bbdb/v1;bbdbv1";
+option java_package = "io.bbdb.v1";
+option java_multiple_files = true;
+
+message Event {
+  bytes  partition_key = 1;
+  uint32 event_type    = 2;
+  int64  timestamp_ns  = 3;
+  bytes  payload       = 4;
+}
+
+message Error {
+  uint32 code    = 1;
+  string message = 2;
+}
