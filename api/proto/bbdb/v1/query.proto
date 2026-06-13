@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package bbdb.v1;
+
+option go_package = "BBDB/api/gen/bbdb/v1;bbdbv1";
+option java_package = "io.bbdb.v1";
+option java_multiple_files = true;
+
+import "bbdb/v1/common.proto";
+
+// EventQuery is the read-path service. One QueryRequest produces a stream of
+// QueryResponse batches. The stream ends with a terminal QueryResponse that
+// carries either a summary or an error.
+service EventQuery {
+  rpc Query(QueryRequest) returns (stream QueryResponse);
+}
+
+message QueryRequest {
+  // partition_key to look up. Must not be empty.
+  bytes  partition_key = 1;
+  // event_type filter. 0 = all event types (event_type 0 is therefore not
+  // addressable as a filter — use values 1-255 for specific types).
+  uint32 event_type    = 2;
+  // Inclusive lower bound (unix nanoseconds). Required.
+  int64  from_ns       = 3;
+  // Exclusive upper bound (unix nanoseconds). Required, must be > from_ns.
+  int64  to_ns         = 4;
+}
+
+// QueryResponse is streamed back to the caller.
+// Non-terminal messages carry events. The terminal message has is_last=true
+// and carries the total count (or an error if the query failed).
+message QueryResponse {
+  repeated Event events    = 1;
+  uint64         total     = 2;  // total events returned (set only in terminal message)
+  bool           is_last   = 3;
+  Error          error     = 4;  // non-nil only in terminal message on failure
+}

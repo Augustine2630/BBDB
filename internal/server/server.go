@@ -98,7 +98,7 @@ func New(cfg config.Config) (*Server, error) {
 		IdxChunkSize:  cfg.Block.IdxChunkSize,
 	}
 
-	grpcServer := bbdbgrpc.NewServer(cfg.GRPC.ListenAddr, db, writerCfg)
+	grpcServer := bbdbgrpc.NewServer(cfg.GRPC.ListenAddr, db, writerCfg, engine)
 
 	return &Server{
 		db:              db,

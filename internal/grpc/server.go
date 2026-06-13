@@ -7,25 +7,27 @@ import (
 	bbdbv1 "BBDB/api/gen/bbdb/v1"
 	"BBDB/internal/ingestion"
 	"BBDB/internal/meta"
+	"BBDB/internal/query"
 
 	"google.golang.org/grpc"
 )
 
-// Server wraps a gRPC server with an IngestionServer.
+// Server wraps a gRPC server with an IngestionServer and a QueryServer.
 type Server struct {
 	listenAddr string
 	grpc       *grpc.Server
 	ingestion  *IngestionServer
 }
 
-// NewServer creates a Server that listens on listenAddr and serves the ingestion RPC.
-func NewServer(listenAddr string, db *meta.DB, writerCfg ingestion.WriterConfig) *Server {
+// NewServer creates a Server that listens on listenAddr and serves write + query RPCs.
+func NewServer(listenAddr string, db *meta.DB, writerCfg ingestion.WriterConfig, engine query.Reader) *Server {
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(UnaryAuthInterceptor),
 		grpc.ChainStreamInterceptor(StreamAuthInterceptor),
 	)
 	ing := NewIngestionServer(db, writerCfg)
 	bbdbv1.RegisterEventIngestionServer(srv, ing)
+	bbdbv1.RegisterEventQueryServer(srv, NewQueryServer(engine))
 	return &Server{
 		listenAddr: listenAddr,
 		grpc:       srv,

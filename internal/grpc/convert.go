@@ -26,6 +26,19 @@ func ResolveTimestamp(ts int64) int64 {
 	return time.Now().UnixNano()
 }
 
+// BlockEventsToProto converts block.Events to proto Events, echoing partitionKey on each.
+func BlockEventsToProto(events []block.Event, partitionKey []byte) []*bbdbv1.Event {
+	out := make([]*bbdbv1.Event, len(events))
+	for i, e := range events {
+		out[i] = &bbdbv1.Event{
+			PartitionKey: partitionKey,
+			TimestampNs:  e.Timestamp,
+			Payload:      e.Payload,
+		}
+	}
+	return out
+}
+
 // ProtoEventsToBlock converts proto Events to block.Events + resolved partition keys.
 // len(resolvedKeys) == len(events) always.
 func ProtoEventsToBlock(events []*bbdbv1.Event) ([]block.Event, [][]byte) {

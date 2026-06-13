@@ -52,6 +52,26 @@ func TestResolveTimestamp_nonzero(t *testing.T) {
 	}
 }
 
+func TestBlockEventsToProto(t *testing.T) {
+	key := []byte("my-key")
+	blockEvs, _ := internalgrpc.ProtoEventsToBlock([]*bbdbv1.Event{
+		{PartitionKey: key, TimestampNs: 42, Payload: []byte("data")},
+	})
+	proto := internalgrpc.BlockEventsToProto(blockEvs, key)
+	if len(proto) != 1 {
+		t.Fatalf("expected 1 proto event, got %d", len(proto))
+	}
+	if string(proto[0].GetPartitionKey()) != string(key) {
+		t.Errorf("partition_key: expected %q, got %q", key, proto[0].GetPartitionKey())
+	}
+	if proto[0].GetTimestampNs() != 42 {
+		t.Errorf("timestamp: expected 42, got %d", proto[0].GetTimestampNs())
+	}
+	if string(proto[0].GetPayload()) != "data" {
+		t.Errorf("payload: expected data, got %s", proto[0].GetPayload())
+	}
+}
+
 func TestProtoEventsToBlock(t *testing.T) {
 	key1 := []byte("partition-a")
 	ts1 := int64(1_000_000)
