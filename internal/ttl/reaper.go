@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
+
 	"BBDB/internal/meta"
 	"BBDB/internal/tier"
 )
@@ -42,12 +44,15 @@ func NewReaper(db *meta.DB, cfg ReaperConfig) *Reaper {
 
 // RunOnce performs a single reap cycle. Safe to call directly in tests.
 func (r *Reaper) RunOnce(ctx context.Context) error {
+	zap.L().Info("reaper cycle started")
 	nowHour := uint64(time.Now().UTC().Unix() / 3600)
 	expired, err := meta.ScanExpiredEntries(r.db, nowHour)
 	if err != nil {
+		zap.L().Error("reaper error", zap.Error(err))
 		return err
 	}
 
+	zap.L().Info("reaper cycle complete", zap.Int("expired_found", len(expired)))
 	interval := time.Second / time.Duration(r.cfg.MaxDeletesPerSec)
 
 	for _, entry := range expired {
@@ -69,14 +74,18 @@ func (r *Reaper) RunOnce(ctx context.Context) error {
 
 		// Step (a): delete file(s) from the tier store.
 		if err := store.Delete(ctx, entry.ID); err != nil {
+			zap.L().Error("delete failed", zap.Error(err), zap.String("block_id", string(entry.ID)))
 			return err
 		}
 
 		// Step (b): atomically delete block meta + expiry key using the hour
 		// that was originally stored in pebble (entry.Hour).
 		if err := meta.DeleteBlockAndExpiry(r.db, entry.Hour, entry.ID); err != nil {
+			zap.L().Error("reaper error", zap.Error(err))
 			return err
 		}
+
+		zap.L().Info("block deleted", zap.String("block_id", string(entry.ID)))
 
 		select {
 		case <-ctx.Done():
@@ -89,7 +98,9 @@ func (r *Reaper) RunOnce(ctx context.Context) error {
 
 // Run starts the reaper loop. Blocks until ctx is cancelled.
 func (r *Reaper) Run(ctx context.Context) {
-	_ = r.RunOnce(ctx)
+	if err := r.RunOnce(ctx); err != nil {
+		zap.L().Error("reaper error", zap.Error(err))
+	}
 	ticker := time.NewTicker(r.cfg.Interval)
 	defer ticker.Stop()
 	for {
@@ -97,7 +108,9 @@ func (r *Reaper) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = r.RunOnce(ctx)
+			if err := r.RunOnce(ctx); err != nil {
+				zap.L().Error("reaper error", zap.Error(err))
+			}
 		}
 	}
 }

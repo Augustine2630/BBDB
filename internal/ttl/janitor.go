@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"go.uber.org/zap"
+
 	"BBDB/internal/meta"
 	"BBDB/internal/tier"
 )
@@ -40,12 +42,15 @@ func NewJanitor(db *meta.DB, cfg JanitorConfig) *Janitor {
 // RunOnce performs a single janitor sweep over all expired-or-past entries.
 // For each entry whose file is absent, it deletes the orphaned pebble metadata.
 func (j *Janitor) RunOnce(ctx context.Context) error {
+	zap.L().Info("janitor sweep started")
 	nowHour := uint64(time.Now().UTC().Unix() / 3600)
 	entries, err := meta.ScanExpiredEntries(j.db, nowHour)
 	if err != nil {
+		zap.L().Error("janitor error", zap.Error(err))
 		return err
 	}
 
+	var cleaned int
 	for _, entry := range entries {
 		if ctx.Err() != nil {
 			return nil
@@ -65,6 +70,7 @@ func (j *Janitor) RunOnce(ctx context.Context) error {
 
 		exists, err := store.Exists(ctx, entry.ID)
 		if err != nil {
+			zap.L().Error("janitor error", zap.Error(err))
 			return err
 		}
 		if exists {
@@ -73,16 +79,24 @@ func (j *Janitor) RunOnce(ctx context.Context) error {
 
 		// Orphan detected: file gone but pebble keys remain. Clean them up.
 		if err := meta.DeleteBlockAndExpiry(j.db, entry.Hour, entry.ID); err != nil {
+			zap.L().Error("janitor error", zap.Error(err))
 			return err
 		}
+
+		zap.L().Info("orphan cleaned", zap.String("block_id", string(entry.ID)))
+		cleaned++
 	}
+
+	zap.L().Info("janitor sweep complete", zap.Int("orphans_cleaned", cleaned))
 	return nil
 }
 
 // Run starts the janitor loop: performs one sweep immediately, then repeats
 // every cfg.Interval. Blocks until ctx is cancelled.
 func (j *Janitor) Run(ctx context.Context) {
-	_ = j.RunOnce(ctx)
+	if err := j.RunOnce(ctx); err != nil {
+		zap.L().Error("janitor error", zap.Error(err))
+	}
 	ticker := time.NewTicker(j.cfg.Interval)
 	defer ticker.Stop()
 	for {
@@ -90,7 +104,9 @@ func (j *Janitor) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = j.RunOnce(ctx)
+			if err := j.RunOnce(ctx); err != nil {
+				zap.L().Error("janitor error", zap.Error(err))
+			}
 		}
 	}
 }
