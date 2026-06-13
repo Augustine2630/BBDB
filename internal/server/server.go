@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"BBDB/internal/config"
 	bbdbgrpc "BBDB/internal/grpc"
 	"BBDB/internal/index"
@@ -39,6 +41,7 @@ func New(cfg config.Config) (*Server, error) {
 		}
 	}
 
+	zap.L().Info("opening pebble", zap.String("dir", cfg.Data.PebbleDir))
 	db, err := meta.Open(cfg.Data.PebbleDir)
 	if err != nil {
 		return nil, err
@@ -100,6 +103,8 @@ func New(cfg config.Config) (*Server, error) {
 
 	grpcServer := bbdbgrpc.NewServer(cfg.GRPC.ListenAddr, db, writerCfg, engine)
 
+	zap.L().Info("server initialized", zap.String("grpc_addr", cfg.GRPC.ListenAddr))
+
 	return &Server{
 		db:              db,
 		engine:          engine,
@@ -155,6 +160,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	<-ctx.Done()
 
+	zap.L().Info("shutdown started")
+
 	waitDone := make(chan struct{})
 	go func() {
 		wg.Wait()
@@ -164,6 +171,7 @@ func (s *Server) Run(ctx context.Context) error {
 	select {
 	case <-waitDone:
 	case <-time.After(s.shutdownTimeout):
+		zap.L().Warn("shutdown timeout exceeded", zap.Duration("timeout", s.shutdownTimeout))
 	}
 
 	s.Shutdown()
@@ -176,5 +184,6 @@ func (s *Server) Shutdown() {
 	if s.onShutdown != nil {
 		s.onShutdown()
 	}
+	zap.L().Info("shutdown complete")
 	_ = s.db.Close()
 }
