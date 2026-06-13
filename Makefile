@@ -47,8 +47,8 @@ test/plan3: ## Read Path: query
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
 .PHONY: test/plan4
-test/plan4: ## TTL + API: ttl + api
-	go test ./internal/ttl/... ./api/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
+test/plan4: ## TTL reaper + janitor
+	go test ./internal/ttl/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
 # ── Single package ─────────────────────────────────────────────────────────────
