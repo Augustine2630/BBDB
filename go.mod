@@ -1,4 +1,4 @@
-module BBDB
+module github.com/Augustine2630/BBDB
 
 go 1.24
 
