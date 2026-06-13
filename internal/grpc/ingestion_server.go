@@ -6,6 +6,8 @@ import (
 	"io"
 	"sync"
 
+	"go.uber.org/zap"
+
 	bbdbv1 "BBDB/api/gen/bbdb/v1"
 	"BBDB/internal/block"
 	"BBDB/internal/ingestion"
@@ -49,6 +51,11 @@ func (s *IngestionServer) Write(stream bbdbv1.EventIngestion_WriteServer) error 
 
 // handleBatch processes a single WriteRequest and returns a WriteResponse.
 func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequest) *bbdbv1.WriteResponse {
+	zap.L().Debug("write batch received",
+		zap.String("batch_id", req.GetBatchId()),
+		zap.Int("events", len(req.GetEvents())),
+		zap.String("request_id", RequestIDFromContext(ctx)),
+	)
 	blockEvents, resolvedKeys := ProtoEventsToBlock(req.GetEvents())
 
 	// Validate event types — after key resolution so partition_keys is always populated.
@@ -76,6 +83,11 @@ func (s *IngestionServer) handleBatch(ctx context.Context, req *bbdbv1.WriteRequ
 	for shard, events := range shardEvents {
 		w := s.getOrCreateWriter(shard)
 		if err := w.Write(ctx, events); err != nil {
+			zap.L().Error("write batch failed",
+				zap.Error(err),
+				zap.String("batch_id", req.GetBatchId()),
+				zap.String("request_id", RequestIDFromContext(ctx)),
+			)
 			return &bbdbv1.WriteResponse{
 				BatchId:       req.GetBatchId(),
 				Accepted:      0,

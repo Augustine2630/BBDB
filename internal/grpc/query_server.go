@@ -3,10 +3,11 @@ package grpc
 import (
 	"time"
 
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+
 	bbdbv1 "BBDB/api/gen/bbdb/v1"
 	"BBDB/internal/query"
-
-	"google.golang.org/grpc"
 )
 
 const queryBatchSize = 256
@@ -34,6 +35,12 @@ func (s *QueryServer) Query(req *bbdbv1.QueryRequest, stream grpc.ServerStreamin
 		return stream.Send(terminalError(0, "from_ns must be before to_ns"))
 	}
 
+	zap.L().Debug("query received",
+		zap.ByteString("partition_key", req.GetPartitionKey()),
+		zap.Int64("from_ns", req.GetFromNs()),
+		zap.Int64("to_ns", req.GetToNs()),
+	)
+
 	var et *uint8
 	if v := req.GetEventType(); v != 0 {
 		u := uint8(v)
@@ -49,10 +56,12 @@ func (s *QueryServer) Query(req *bbdbv1.QueryRequest, stream grpc.ServerStreamin
 
 	events, err := s.engine.Query(stream.Context(), qreq)
 	if err != nil {
+		zap.L().Error("query failed", zap.Error(err))
 		return stream.Send(terminalError(0, err.Error()))
 	}
 
 	total := uint64(len(events))
+	var sent uint64
 	protoEvents := BlockEventsToProto(events, req.GetPartitionKey())
 
 	// Stream in batches; last batch carries is_last + total.
@@ -73,7 +82,10 @@ func (s *QueryServer) Query(req *bbdbv1.QueryRequest, stream grpc.ServerStreamin
 		if err := stream.Send(resp); err != nil {
 			return err
 		}
+		sent += uint64(len(batch))
 	}
+
+	zap.L().Debug("query complete", zap.Uint64("total", sent))
 
 	// Empty result: send a single terminal message.
 	if len(protoEvents) == 0 {

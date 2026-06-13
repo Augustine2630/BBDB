@@ -4,12 +4,13 @@ import (
 	"context"
 	"net"
 
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+
 	bbdbv1 "BBDB/api/gen/bbdb/v1"
 	"BBDB/internal/ingestion"
 	"BBDB/internal/meta"
 	"BBDB/internal/query"
-
-	"google.golang.org/grpc"
 )
 
 // Server wraps a gRPC server with an IngestionServer and a QueryServer.
@@ -42,6 +43,8 @@ func (s *Server) Run(ctx context.Context) error {
 		return err
 	}
 
+	zap.L().Info("gRPC server listening", zap.String("addr", s.listenAddr))
+
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- s.grpc.Serve(lis)
@@ -49,8 +52,10 @@ func (s *Server) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
+		zap.L().Info("gRPC server stopping")
 		s.grpc.GracefulStop()
 		s.ingestion.Stop()
+		zap.L().Info("gRPC server stopped")
 		return nil
 	case err := <-errCh:
 		return err
