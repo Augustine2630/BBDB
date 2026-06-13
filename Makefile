@@ -90,6 +90,12 @@ docker/run: ## Run Docker image (CONFIG=path/to/cfg.yaml IMAGE=bbdb TAG=latest)
 		$(IMAGE):$(TAG) \
 		$(if $(CONFIG),--config /etc/bbdb/config.yaml,)
 
+# ── Proto ─────────────────────────────────────────────────────────────────────
+
+.PHONY: proto/gen
+proto/gen: ## Generate Go code from proto files (requires buf)
+	buf generate
+
 # ── Single package ─────────────────────────────────────────────────────────────
 
 .PHONY: test/pkg
