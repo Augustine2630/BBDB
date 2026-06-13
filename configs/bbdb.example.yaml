@@ -32,3 +32,6 @@ ttl:
   reaper_max_deletes_per_sec: 100
   janitor_interval: 1h
   shutdown_timeout: 30s  # max wait for reaper/janitor to stop before force-close
+
+grpc:
+  listen_addr: ":7070"

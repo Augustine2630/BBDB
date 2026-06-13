@@ -53,6 +53,11 @@ type TTLConfig struct {
 	ShutdownTimeout        time.Duration `mapstructure:"shutdown_timeout"`
 }
 
+// GRPCConfig controls the gRPC server.
+type GRPCConfig struct {
+	ListenAddr string `mapstructure:"listen_addr"`
+}
+
 // Config is the root configuration for a BBDB node.
 type Config struct {
 	Data      DataConfig      `mapstructure:"data"`
@@ -61,6 +66,7 @@ type Config struct {
 	Block     BlockConfig     `mapstructure:"block"`
 	Query     QueryConfig     `mapstructure:"query"`
 	TTL       TTLConfig       `mapstructure:"ttl"`
+	GRPC      GRPCConfig      `mapstructure:"grpc"`
 }
 
 // Load reads configuration from cfgFile (YAML). If cfgFile is empty, only
@@ -88,6 +94,7 @@ func Load(cfgFile string) (Config, error) {
 	v.SetDefault("ttl.reaper_max_deletes_per_sec", 100)
 	v.SetDefault("ttl.janitor_interval", time.Hour)
 	v.SetDefault("ttl.shutdown_timeout", 30*time.Second)
+	v.SetDefault("grpc.listen_addr", ":7070")
 
 	// Environment variables: BBDB_DATA__PEBBLE_DIR → data.pebble_dir
 	v.SetEnvPrefix("BBDB")
