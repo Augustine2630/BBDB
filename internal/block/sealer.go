@@ -12,21 +12,23 @@ import (
 )
 
 const (
-	idxChunkSize          = 100_000
+	DefaultIdxChunkSize   = 100_000
 	defaultRetentionHours = 5 * 365 * 24 // 5 years
 )
 
 // SealRequest holds all inputs needed to seal a memtable into a block file.
 type SealRequest struct {
-	DB        *meta.DB
-	Store     tier.TierStore
-	TmpDir    string
-	Shard     meta.ShardID
-	EventType uint8
-	OpenedAt  int64         // unix nano
-	SealedAt  int64         // unix nano
-	Memtable  *Memtable
-	Retention time.Duration // how long to keep the block; 0 = default 5 years
+	DB           *meta.DB
+	Store        tier.TierStore
+	TmpDir       string
+	Shard        meta.ShardID
+	EventType    uint8
+	OpenedAt     int64 // unix nano
+	SealedAt     int64 // unix nano
+	Memtable     *Memtable
+	Retention    time.Duration // how long to keep the block; 0 = default 5 years
+	BloomFPR     float64       // false-positive rate for bloom filter; 0 = DefaultBloomFPR (0.01)
+	IdxChunkSize int           // pebble NoSync batch size for index keys; 0 = DefaultIdxChunkSize (100 000)
 }
 
 // Seal sorts the memtable, writes a compressed block file, writes a bloom file,
@@ -86,7 +88,7 @@ func Seal(ctx context.Context, req SealRequest) (meta.BlockID, error) {
 	f.Close()
 
 	// 3. Build and write bloom file (must fsync BEFORE rename)
-	bloomData, err := BuildBloomFromMemtable(req.Memtable).Serialize()
+	bloomData, err := BuildBloomFromMemtable(req.Memtable, req.BloomFPR).Serialize()
 	if err != nil {
 		os.Remove(tmpPath)
 		return "", fmt.Errorf("build bloom: %w", err)
@@ -122,10 +124,14 @@ func Seal(ctx context.Context, req SealRequest) (meta.BlockID, error) {
 		return "", fmt.Errorf("store.Put: %w", err)
 	}
 
-	// 5. Write idx keys in NoSync chunks of idxChunkSize
+	// 5. Write idx keys in NoSync chunks
+	chunkSize := req.IdxChunkSize
+	if chunkSize <= 0 {
+		chunkSize = DefaultIdxChunkSize
+	}
 	uniqueHashes := req.Memtable.UniqueKeyHashes()
-	for start := 0; start < len(uniqueHashes); start += idxChunkSize {
-		end := start + idxChunkSize
+	for start := 0; start < len(uniqueHashes); start += chunkSize {
+		end := start + chunkSize
 		if end > len(uniqueHashes) {
 			end = len(uniqueHashes)
 		}

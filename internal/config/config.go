@@ -32,6 +32,12 @@ type IngestionConfig struct {
 	MaxBlockBytes int64         `mapstructure:"max_block_bytes"` // size-based seal; 0 = 256 MiB
 }
 
+// BlockConfig controls block sealing behaviour.
+type BlockConfig struct {
+	BloomFPR     float64 `mapstructure:"bloom_fpr"`      // bloom filter false-positive rate (0–1); default 0.01
+	IdxChunkSize int     `mapstructure:"idx_chunk_size"` // pebble NoSync batch size for index keys; default 100000
+}
+
 // QueryConfig controls the read-path engine.
 type QueryConfig struct {
 	MaxParallel     int   `mapstructure:"max_parallel"`
@@ -52,6 +58,7 @@ type Config struct {
 	Data      DataConfig      `mapstructure:"data"`
 	Tiers     TiersConfig     `mapstructure:"tiers"`
 	Ingestion IngestionConfig `mapstructure:"ingestion"`
+	Block     BlockConfig     `mapstructure:"block"`
 	Query     QueryConfig     `mapstructure:"query"`
 	TTL       TTLConfig       `mapstructure:"ttl"`
 }
@@ -72,6 +79,8 @@ func Load(cfgFile string) (Config, error) {
 	v.SetDefault("ingestion.batch_interval", 2*time.Millisecond)
 	v.SetDefault("ingestion.ring_buf_size", 16384)
 	v.SetDefault("ingestion.max_block_bytes", int64(256<<20))
+	v.SetDefault("block.bloom_fpr", 0.01)
+	v.SetDefault("block.idx_chunk_size", 100_000)
 	v.SetDefault("query.max_parallel", 8)
 	v.SetDefault("query.bloom_cache_bytes", int64(64*1024*1024))
 	v.SetDefault("ttl.retention_period", 5*365*24*time.Hour)

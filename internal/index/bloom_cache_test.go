@@ -24,7 +24,7 @@ func newBloomCacheTestStore(t *testing.T) (tier.TierStore, func()) {
 
 func writeTestBloom(t *testing.T, store tier.TierStore, id meta.BlockID, hashes []uint64) {
 	t.Helper()
-	bf := block.BuildBloom(hashes)
+	bf := block.BuildBloom(hashes, 0)
 	data, err := bf.Serialize()
 	if err != nil {
 		t.Fatal(err)

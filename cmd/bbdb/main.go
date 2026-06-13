@@ -25,8 +25,8 @@ func newRootCmd() *cobra.Command {
 	var cfgFile string
 
 	root := &cobra.Command{
-		Use:   "bbdb",
-		Short: "BigBrotherDB — append-only telecom event storage engine",
+		Use:               "bbdb",
+		Short:             "BigBrotherDB — append-only telecom event storage engine",
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 	}
 
@@ -57,6 +57,7 @@ func newStartCmd(cfgFile *string) *cobra.Command {
 			defer stop()
 
 			fmt.Fprintln(cmd.OutOrStdout(), "bbdb starting…")
+			fmt.Fprintln(cmd.OutOrStdout(), "bbdb ready. Press Ctrl+C to stop.")
 			if err := srv.Run(ctx); err != nil {
 				return err
 			}

@@ -92,6 +92,8 @@ func New(cfg config.Config) (*Server, error) {
 		TmpDir:        cfg.Data.TmpDir,
 		Retention:     cfg.TTL.RetentionPeriod,
 		MaxBlockBytes: cfg.Ingestion.MaxBlockBytes,
+		BloomFPR:      cfg.Block.BloomFPR,
+		IdxChunkSize:  cfg.Block.IdxChunkSize,
 	}
 
 	return &Server{

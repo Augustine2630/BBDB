@@ -6,7 +6,7 @@ import (
 	"github.com/bits-and-blooms/bloom/v3"
 )
 
-const bloomFPR = 0.01 // 1% false positive rate
+const DefaultBloomFPR = 0.01 // 1% false positive rate
 
 // BloomFilter wraps bits-and-blooms for BBDB's use.
 // Stores xxHash64(partition_key) values as 8-byte big-endian keys.
@@ -15,12 +15,16 @@ type BloomFilter struct {
 }
 
 // BuildBloom creates a bloom filter from a slice of key_hash values.
-func BuildBloom(keyHashes []uint64) *BloomFilter {
+// fpr is the desired false-positive rate (e.g. 0.01); 0 uses DefaultBloomFPR.
+func BuildBloom(keyHashes []uint64, fpr float64) *BloomFilter {
+	if fpr <= 0 {
+		fpr = DefaultBloomFPR
+	}
 	n := uint(len(keyHashes))
 	if n == 0 {
 		n = 1
 	}
-	bf := bloom.NewWithEstimates(n, bloomFPR)
+	bf := bloom.NewWithEstimates(n, fpr)
 	for _, h := range keyHashes {
 		bf.Add(uint64ToBytes(h))
 	}
@@ -28,8 +32,9 @@ func BuildBloom(keyHashes []uint64) *BloomFilter {
 }
 
 // BuildBloomFromMemtable builds a bloom filter from all unique key_hash values in a memtable.
-func BuildBloomFromMemtable(mt *Memtable) *BloomFilter {
-	return BuildBloom(mt.UniqueKeyHashes())
+// fpr is the desired false-positive rate; 0 uses DefaultBloomFPR.
+func BuildBloomFromMemtable(mt *Memtable, fpr float64) *BloomFilter {
+	return BuildBloom(mt.UniqueKeyHashes(), fpr)
 }
 
 // TestHash returns true if the key_hash might be in the set (false = definitely absent).

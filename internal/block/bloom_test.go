@@ -8,7 +8,7 @@ import (
 
 func TestBloomBuildAndTest(t *testing.T) {
 	hashes := []uint64{111, 222, 333, 444}
-	bf := block.BuildBloom(hashes)
+	bf := block.BuildBloom(hashes, 0)
 	for _, h := range hashes {
 		if !bf.TestHash(h) {
 			t.Fatalf("bloom must contain inserted hash %d", h)
@@ -18,7 +18,7 @@ func TestBloomBuildAndTest(t *testing.T) {
 
 func TestBloomSerializeDeserialize(t *testing.T) {
 	hashes := []uint64{100, 200, 300}
-	bf := block.BuildBloom(hashes)
+	bf := block.BuildBloom(hashes, 0)
 
 	data, err := bf.Serialize()
 	if err != nil {
@@ -45,7 +45,7 @@ func TestBloomAbsentHashLowFPR(t *testing.T) {
 	for i := range hashes {
 		hashes[i] = uint64(i)
 	}
-	bf := block.BuildBloom(hashes)
+	bf := block.BuildBloom(hashes, 0)
 
 	fp := 0
 	for i := uint64(n); i < uint64(n*2); i++ {
@@ -65,7 +65,7 @@ func TestBloomFromMemtable(t *testing.T) {
 	mt.Append(block.Event{KeyHash: 20, Timestamp: 2, Payload: []byte("y")})
 	mt.Append(block.Event{KeyHash: 10, Timestamp: 3, Payload: []byte("z")}) // duplicate
 
-	bf := block.BuildBloomFromMemtable(mt)
+	bf := block.BuildBloomFromMemtable(mt, 0)
 	if !bf.TestHash(10) {
 		t.Fatal("bloom must contain key_hash 10")
 	}
@@ -76,7 +76,7 @@ func TestBloomFromMemtable(t *testing.T) {
 
 func TestBloomEmptySet(t *testing.T) {
 	// Empty set should not panic
-	bf := block.BuildBloom(nil)
+	bf := block.BuildBloom(nil, 0)
 	// Any test should return false (or a FP — either is acceptable)
 	_ = bf.TestHash(42)
 }

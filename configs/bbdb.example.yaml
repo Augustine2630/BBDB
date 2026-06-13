@@ -2,21 +2,25 @@
 # All values shown are defaults. Override via env: BBDB_<SECTION>__<KEY>
 
 data:
-  pebble_dir: /data/pebble
-  tmp_dir: /data/tmp
+  pebble_dir: /data/pebble  # local dev: ./pebble
+  tmp_dir: /data/tmp         # local dev: ./tmp
 
 tiers:
   hot:
-    root: /data/tiers/hot
+    root: /data/tiers/hot   # local dev: ./tiers/hot
   warm:
-    root: /data/tiers/warm
+    root: /data/tiers/warm  # local dev: ./tiers/warm
   cold:
-    root: /data/tiers/cold
+    root: /data/tiers/cold  # local dev: ./tiers/cold
 
 ingestion:
   batch_interval: 2ms
   ring_buf_size: 16384
   max_block_bytes: 268435456  # 256 MiB; size-triggered seal
+
+block:
+  bloom_fpr: 0.01       # bloom filter false-positive rate per block
+  idx_chunk_size: 100000  # pebble NoSync batch size for sparse index writes
 
 query:
   max_parallel: 8

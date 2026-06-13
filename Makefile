@@ -64,13 +64,31 @@ test/plan5: ## Config + CLI: config + server
 	go test ./internal/config/... ./internal/server/... -v -count=1 -coverprofile=$(COVERAGE_OUT)
 	go tool cover -func=$(COVERAGE_OUT) | grep -E "^BBDB|^total"
 
+# Configurable: CONFIG=configs/bbdb.example.yaml make run
+CONFIG ?=
+IMAGE  ?= bbdb
+TAG    ?= latest
+
 .PHONY: build/bbdb
-build/bbdb: ## Build the bbdb binary
-	go build -o bin/bbdb ./cmd/bbdb/
+build/bbdb: ## Build the bbdb binary → bin/bbdb
+	go build -trimpath -ldflags="-s -w" -o bin/bbdb ./cmd/bbdb/
 
 .PHONY: run
-run: build/bbdb ## Run bbdb with default config (requires data dirs to exist)
-	./bin/bbdb start
+run: build/bbdb ## Run bbdb (CONFIG=path/to/cfg.yaml make run)
+	./bin/bbdb start $(if $(CONFIG),--config $(CONFIG),)
+
+# ── Docker ─────────────────────────────────────────────────────────────────────
+
+.PHONY: docker/build
+docker/build: ## Build Docker image (IMAGE=bbdb TAG=latest)
+	docker build -t $(IMAGE):$(TAG) .
+
+.PHONY: docker/run
+docker/run: ## Run Docker image (CONFIG=path/to/cfg.yaml IMAGE=bbdb TAG=latest)
+	docker run --rm \
+		$(if $(CONFIG),-v $(abspath $(CONFIG)):/etc/bbdb/config.yaml,) \
+		$(IMAGE):$(TAG) \
+		$(if $(CONFIG),--config /etc/bbdb/config.yaml,)
 
 # ── Single package ─────────────────────────────────────────────────────────────
 

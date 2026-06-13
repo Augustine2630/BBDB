@@ -22,6 +22,8 @@ type WriterConfig struct {
 	TmpDir        string
 	Retention     time.Duration // 0 = block.Seal default (5 years)
 	MaxBlockBytes int64         // size-based seal threshold; 0 = 256 MiB
+	BloomFPR      float64       // 0 = block.DefaultBloomFPR (0.01)
+	IdxChunkSize  int           // 0 = block.DefaultIdxChunkSize (100 000)
 }
 
 // DefaultWriterConfig returns production-safe defaults (≤2ms batch interval, autoseal disabled).
@@ -132,15 +134,17 @@ func (sw *ShardWriter) flushAndMaybeSeal(ctx context.Context, forceSeal bool) {
 // sealCurrent calls block.Seal for the current memtable, then resets for the next block.
 func (sw *ShardWriter) sealCurrent(ctx context.Context, sealedAt time.Time) {
 	_, _ = block.Seal(ctx, block.SealRequest{
-		DB:        sw.db,
-		Store:     sw.cfg.Store,
-		TmpDir:    sw.cfg.TmpDir,
-		Shard:     sw.shard,
-		EventType: uint8(sw.shard >> 8), // upper byte of ShardID encodes event_type
-		OpenedAt:  sw.openedAt.UnixNano(),
-		SealedAt:  sealedAt.UnixNano(),
-		Memtable:  sw.memtable,
-		Retention: sw.cfg.Retention,
+		DB:           sw.db,
+		Store:        sw.cfg.Store,
+		TmpDir:       sw.cfg.TmpDir,
+		Shard:        sw.shard,
+		EventType:    uint8(sw.shard >> 8), // upper byte of ShardID encodes event_type
+		OpenedAt:     sw.openedAt.UnixNano(),
+		SealedAt:     sealedAt.UnixNano(),
+		Memtable:     sw.memtable,
+		Retention:    sw.cfg.Retention,
+		BloomFPR:     sw.cfg.BloomFPR,
+		IdxChunkSize: sw.cfg.IdxChunkSize,
 	})
 	sw.memtable = block.NewMemtable()
 	sw.openedAt = hourBoundary(sealedAt)
